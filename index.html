@@ -142,11 +142,11 @@ body {
 <div class="summary-bar" id="summary"></div>
 <div class="grid" id="grid"></div>
 <div class="last-updated" id="updated"></div>
-<div style="text-align:center;font-size:10px;color:#bbb;padding-bottom:20px;">页面构建于 2026-07-07 17:49:05</div>
+<div style="text-align:center;font-size:10px;color:#bbb;padding-bottom:20px;">页面构建于 2026-07-07 17:54:28</div>
 <script>
 // WeChat/浏览器缓存检测：每次加载时查询服务器版本，不一致则强制刷新
 (function checkVersion() {
-  var buildTime = "2026-07-07 17:49:05";
+  var buildTime = "2026-07-07 17:54:28";
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'version.json?t=' + Date.now(), true);
@@ -182,16 +182,18 @@ function parseDate(s) {
 }
 
 function isOverdue(dl) {
+  if (!dl) return false;
   const d = parseDate(dl);
   if (!d) return false;
   return d < parseDate(TODAY);
 }
 
 function isToday(dl) {
-  return dl === TODAY;
+  return dl && dl === TODAY;
 }
 
 function isTomorrow(dl) {
+  if (!dl) return false;
   const t = parseDate(TODAY);
   if (!t) return false;
   t.setDate(t.getDate() + 1);
@@ -275,7 +277,7 @@ function render() {
       const sorted = [...p.active].sort((a, b) => {
         if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
         if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
-        return (a.deadline || '').localeCompare(b.deadline || '');
+        return (a.deadline || '9999').localeCompare(b.deadline || '9999');
       });
 
       sorted.forEach(item => {
@@ -283,7 +285,10 @@ function render() {
         const dotCls = item.status === 'in_progress' ? 'in_progress' : 'pending';
         let dlText = '';
         let dlClass = '';
-        if (isOverdue(item.deadline)) {
+        if (!item.deadline) {
+          dlText = '';
+          dlClass = '';
+        } else if (isOverdue(item.deadline)) {
           const days = Math.floor((parseDate(TODAY) - parseDate(item.deadline)) / (1000*60*60*24));
           dlText = '已逾期 ' + days + ' 天';
           dlClass = 'overdue-text';
@@ -303,7 +308,7 @@ function render() {
         html += `<div class="status-dot ${dotCls}"></div>`;
         html += `<div class="item-body">`;
         html += `<div class="content">${esc(item.content)}</div>`;
-        html += `<div class="meta-line">${prioTag}<span class="tag ${dlClass}">📅 ${dlText}</span></div>`;
+        html += `<div class="meta-line">${prioTag}${dlText ? `<span class="tag ${dlClass}">📅 ${dlText}</span>` : ''}</div>`;
         html += `</div></div>`;
       });
     }
