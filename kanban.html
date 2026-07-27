@@ -144,6 +144,12 @@ body {
   cursor: pointer; transition: transform .15s; background: #f8f9fa;
 }
 .task-img:hover { transform: scale(1.04); }
+.task-img.img-error { display: none; }
+.img-fallback {
+  font-size: 11px; color: #999;
+  padding: 4px 8px; background: #f3f4f6;
+  border-radius: 6px; margin-top: 4px;
+}
 
 /* 图片放大灯箱 */
 .lightbox {
@@ -167,7 +173,7 @@ body {
   <img id="lightbox-img" src="" alt="放大查看">
 </div>
 <script>
-var BUILD_TIME = "2026-07-27 14:35:37";
+var BUILD_TIME = "2026-07-27 14:53:18";
 // WeChat/浏览器缓存检测：每次加载时查询服务器版本，不一致则强制刷新
 (function checkVersion() {
   var buildTime = BUILD_TIME;
@@ -205,7 +211,12 @@ function renderContent(raw) {
   function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+  function escAttr(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
   const imgRegex = /【附图：([^】]*?)】/g;
+  // 每小时刷新一次缓存键，避免同名图片更新后被浏览器缓存挡住
+  const cacheBust = '?v=' + Math.floor(Date.now() / 3600000);
   let out = '';
   let last = 0;
   let m;
@@ -214,9 +225,16 @@ function renderContent(raw) {
     const paths = m[1].split(/[；;]/).map(p => p.trim()).filter(Boolean);
     let imgs = '';
     paths.forEach(p => {
-      let url = p.replace(/^F:\/workbuddy\//i, COS_BASE + '/');
+      // 同时兼容 F:/workbuddy/ 与 F:\workbuddy\，统一转成 URL 斜杠
+      let url = p.replace(/^F:[\\/]workbuddy[\\/]/i, '/').replace(/\\/g, '/');
+      // 本地路径补全 COS 公网地址（云端注入前 publish_attachments 已改写为 URL，此行兜底）
+      if (!/^https?:\/\//i.test(url)) {
+        url = COS_BASE + url;
+      }
+      url = url + cacheBust;
       const safe = url.replace(/'/g, "\\'");
-      imgs += '<img class="task-img" src="' + escHtml(url) + '" onclick="openLightbox(\'' + safe + '\')" alt="附图" loading="lazy">';
+      imgs += '<img class="task-img" src="' + escAttr(url) + '" onclick="openLightbox(\'' + safe + '\')" alt="附图" loading="lazy" onerror="this.style.display=\'none\'; this.nextElementSibling && (this.nextElementSibling.style.display=\'inline-block\');">';
+      imgs += '<span class="img-fallback" style="display:none">图片加载失败：' + escHtml(url.split('?')[0]) + '</span>';
     });
     if (imgs) out += '<div class="task-images">' + imgs + '</div>';
     last = imgRegex.lastIndex;
