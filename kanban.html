@@ -149,7 +149,10 @@ body {
   font-size: 11px; color: #999;
   padding: 4px 8px; background: #f3f4f6;
   border-radius: 6px; margin-top: 4px;
+  display: inline-flex; align-items: center; gap: 6px;
 }
+.img-fallback a { color: #3b82f6; text-decoration: none; }
+.img-fallback a:hover { text-decoration: underline; }
 
 /* 图片放大灯箱 */
 .lightbox {
@@ -173,7 +176,7 @@ body {
   <img id="lightbox-img" src="" alt="放大查看">
 </div>
 <script>
-var BUILD_TIME = "2026-07-27 14:53:18";
+var BUILD_TIME = "2026-07-27 15:10:18";
 // WeChat/浏览器缓存检测：每次加载时查询服务器版本，不一致则强制刷新
 (function checkVersion() {
   var buildTime = BUILD_TIME;
@@ -226,21 +229,40 @@ function renderContent(raw) {
     let imgs = '';
     paths.forEach(p => {
       // 同时兼容 F:/workbuddy/ 与 F:\workbuddy\，统一转成 URL 斜杠
-      let url = p.replace(/^F:[\\/]workbuddy[\\/]/i, '/').replace(/\\/g, '/');
+      let relUrl = p.replace(/^F:[\\/]workbuddy[\\/]/i, '/').replace(/\\/g, '/');
       // 本地路径补全 COS 公网地址（云端注入前 publish_attachments 已改写为 URL，此行兜底）
-      if (!/^https?:\/\//i.test(url)) {
-        url = COS_BASE + url;
+      if (!/^https?:\/\//i.test(relUrl)) {
+        relUrl = COS_BASE + relUrl;
       }
-      url = url + cacheBust;
-      const safe = url.replace(/'/g, "\\'");
-      imgs += '<img class="task-img" src="' + escAttr(url) + '" onclick="openLightbox(\'' + safe + '\')" alt="附图" loading="lazy" onerror="this.style.display=\'none\'; this.nextElementSibling && (this.nextElementSibling.style.display=\'inline-block\');">';
-      imgs += '<span class="img-fallback" style="display:none">图片加载失败：' + escHtml(url.split('?')[0]) + '</span>';
+      const plainUrl = relUrl; // 无缓存键的绝对地址
+      const url = plainUrl + cacheBust;
+      const safe = plainUrl.replace(/'/g, "\\'");
+      imgs += '<img class="task-img" src="' + escAttr(url) + '" data-plain="' + escAttr(plainUrl) + '" onclick="openLightbox(\'' + safe + '\')" alt="附图" loading="lazy" onerror="retryImg(this)">';
+      imgs += '<span class="img-fallback" style="display:none">图片加载失败：<a href="' + escAttr(plainUrl) + '" target="_blank" onclick="event.stopPropagation()">' + escHtml(plainUrl.replace(COS_BASE, '')) + '</a></span>';
     });
     if (imgs) out += '<div class="task-images">' + imgs + '</div>';
     last = imgRegex.lastIndex;
   }
   out += escHtml(raw.substring(last));
   return out;
+}
+
+function retryImg(img) {
+  if (img.dataset.retried) {
+    img.classList.add('img-error');
+    img.style.display = 'none';
+    if (img.nextElementSibling) img.nextElementSibling.style.display = 'inline-flex';
+    return;
+  }
+  img.dataset.retried = '1';
+  var plain = img.dataset.plain;
+  if (plain && plain !== img.src.split('?')[0]) {
+    img.src = plain + '?retry=' + Date.now();
+  } else {
+    img.classList.add('img-error');
+    img.style.display = 'none';
+    if (img.nextElementSibling) img.nextElementSibling.style.display = 'inline-flex';
+  }
 }
 
 function openLightbox(src) {
